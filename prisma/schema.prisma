@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String     @id @default(uuid())
+  planId             String
+  email              String     @unique
+  password           String
+  role               UserRole   @default(USER)
+  needPasswordChange Boolean    @default(true)
+  status             UserStatus @default(ACTIVE)
+
+  userProfile UserProfile?
+  task        Task[]
+  review      Review[]
+  tokenUsage  TokenUsage[]
+  payment     Payment[]
+
+  plan Plan? @relation(fields: [planId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model UserProfile {
+  id            String  @id @default(uuid())
+  name          String
+  email         String  @unique
+  profilePhoto  String?
+  contactNumber String
+  isDeleted     Boolean @default(false)
+
+  user User @relation(fields: [email], references: [email])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profile")
+}
+
+model Task {
+  id          String  @id @default(uuid())
+  userId      String
+  title       String
+  content     String?
+  isFavorite  Boolean @default(false)
+  isScheduled Boolean @default(false)
+  isPublic    Boolean @default(false)
+  rating      Float?
+
+  message Message[]
+  review  Review?
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+model Message {
+  id      String  @id @default(uuid())
+  taskId  String
+  role    String // "user" | "assistant"
+  content String
+  topic   String?
+  image   String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messages")
+}
+
+model Sms {
+  id         String  @id @default(uuid())
+  senderId   String
+  receiverId String
+  text       String
+  image      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sms")
+}
+
+model Review {
+  id      String @id @default(uuid())
+  userId  String
+  taskId  String @unique
+  rating  Float
+  comment String
+
+  user User @relation(fields: [userId], references: [id])
+  task Task @relation(fields: [taskId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+model TokenUsage {
+  id        String @id @default(uuid())
+  userId    String
+  usedCount Int    @default(0) // Used to enforce monthly question limit
+  month     Int
+  year      Int
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@map("token_usages")
+}
+
+model Plan {
+  id         String  @id @default(uuid())
+  name       String
+  tokenLimit Int
+  price      Float
+  isActive   Boolean @default(true)
+
+  user    User[]
+  payment Payment[]
+
+  @@map("plans")
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  userId             String
+  planId             String?
+  amount             Float
+  transactionId      String        @unique
+  status             PaymentStatus @default(UNPAID)
+  paymentGatewayData Json?
+
+  user User  @relation(fields: [userId], references: [id])
+  plan Plan? @relation(fields: [planId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+}
